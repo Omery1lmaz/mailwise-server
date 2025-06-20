@@ -13,11 +13,13 @@ import nodemailer from 'nodemailer';
 import MailLog from './mailLogModel.js';
 
 const router = express.Router();
-const upload = multer({ dest: 'uploads/' });
 
 // ES modules için __dirname alternatifi
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Multer'ı memoryStorage ile başlat (Vercel uyumlu)
+const upload = multer({ storage: multer.memoryStorage() });
 
 const SELECTED_FIELDS = [
     'First Name', 'Last Name', 'Title', 'Company', 'Company Name for Emails', 'Email',
