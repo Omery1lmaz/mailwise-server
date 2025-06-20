@@ -15,7 +15,7 @@ import emailQueueRoutes from './emailQueueRoutes.js';
 import EmailQueue from './emailQueueModel.js';
 import userRoutes from './userRoutes.js';
 import './cronWorker.js'; // Cron job'ı başlatmak için import
-
+import { cron } from "./vercelCron.js"
 const SELECTED_FIELDS = [
     'First Name',
     'Last Name',
@@ -195,6 +195,8 @@ app.get('/', (req, res) => {
         timestamp: new Date().toISOString()
     });
 });
+
+app.use('/cron', cron);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
