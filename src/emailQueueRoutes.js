@@ -11,6 +11,7 @@ import { adminAuthMiddleware } from './auth.js';
 import { Parser as Json2csvParser } from 'json2csv';
 import nodemailer from 'nodemailer';
 import MailLog from './mailLogModel.js';
+import stream from 'stream';
 
 const router = express.Router();
 
@@ -31,10 +32,14 @@ const SELECTED_FIELDS = [
 ];
 
 router.post('/upload', adminAuthMiddleware, upload.single('file'), async (req, res) => {
-    const filePath = req.file.path;
+    if (!req.file) {
+        return res.status(400).json({ error: 'Dosya yüklenemedi' });
+    }
     const results = [];
+    const bufferStream = new stream.PassThrough();
+    bufferStream.end(req.file.buffer);
 
-    fs.createReadStream(filePath)
+    bufferStream
         .pipe(csv())
         .on('data', (row) => {
             const filtered = {};
@@ -87,7 +92,6 @@ router.post('/upload', adminAuthMiddleware, upload.single('file'), async (req, r
                 }));
 
             await EmailQueue.insertMany(queueDocs);
-            fs.unlinkSync(filePath);
             res.json({ message: 'Yalnızca yeni emailler kuyruğa eklendi', count: queueDocs.length });
         })
         .on('error', (err) => {

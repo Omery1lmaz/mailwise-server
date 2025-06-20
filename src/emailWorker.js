@@ -8,6 +8,7 @@ import nodemailer from 'nodemailer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { parentPort, workerData } from 'worker_threads';
+import MailAccount from './mailAccountModel.js';
 
 dotenv.config();
 
@@ -15,16 +16,23 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Email gönderimi için transporter oluştur
-const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: {
-        user: "omer@omerfarukyilmaz.dev",
-        pass: "jblloliwllagtkib"
+async function getRandomAvailableAccount() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const accounts = await MailAccount.find({ active: true });
+    // Günlük limit sıfırlama
+    for (const acc of accounts) {
+        if (!acc.lastSentDate || acc.lastSentDate < today) {
+            acc.sentToday = 0;
+            acc.lastSentDate = today;
+            await acc.save();
+        }
     }
-});
+    const available = accounts.filter(acc => acc.sentToday < acc.dailyLimit);
+    if (available.length === 0) throw new Error('Tüm SMTP hesaplarının günlük limiti doldu');
+    const idx = Math.floor(Math.random() * available.length);
+    return available[idx];
+}
 
 // Email gönderme fonksiyonu
 async function sendEmail(emailData) {
@@ -35,8 +43,16 @@ async function sendEmail(emailData) {
         // Email içeriğini oluştur
         const body = createMailBody(emailData.personData || emailData);
 
+        const account = await getRandomAvailableAccount();
+        const transporter = nodemailer.createTransport({
+            host: 'smtp.gmail.com',
+            port: 465,
+            secure: true,
+            auth: { user: account.user, pass: account.pass }
+        });
+
         const mailOptions = {
-            from: `"Ömer Faruk Yılmaz" <omer@omerfarukyilmaz.dev>`,
+            from: account.from,
             to: emailData.email,
             subject: 'İş Başvurusu: Yazılım Geliştirici',
             text: body,
@@ -51,6 +67,11 @@ async function sendEmail(emailData) {
         // Email'i gönder
         await transporter.sendMail(mailOptions);
 
+        // Hesabın gönderim sayısını artır
+        account.sentToday += 1;
+        account.lastSentDate = new Date();
+        await account.save();
+
         // Başarılı gönderim kaydı
         await EmailQueue.findByIdAndUpdate(emailData._id, {
             isSend: true,
@@ -62,11 +83,13 @@ async function sendEmail(emailData) {
         // Log kaydı oluştur
         await MailLog.create({
             email: emailData.email,
+            from: account.from,
             firstName: emailData.firstName,
             lastName: emailData.lastName,
             company: emailData.company,
             status: 'sent',
-            sentAt: new Date()
+            sentAt: new Date(),
+            attachments: mailOptions.attachments ? mailOptions.attachments.map(a => a.filename) : []
         });
 
         console.log(`Email sent successfully to ${emailData.email}`);

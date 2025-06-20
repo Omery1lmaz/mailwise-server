@@ -113,7 +113,20 @@ function extractSelectedData() {
 }
 
 function createMailBody(person) {
-    return `Merhaba ${person['First Name'] || ''} ${person['Last Name'] || ''},\n\n${person['Company'] ? person['Company'] + ' şirketinizde' : ''} açık pozisyonlar için başvurmak istiyorum.\n\nPozisyon: ${person['Title'] || '-'}\nŞirket: ${person['Company'] || '-'}\nLinkedIn: ${person['Person Linkedin Url'] || '-'}\n\nCV'm ekte yer almaktadır.\n\nİyi çalışmalar.\nÖmer Faruk Yılmaz`;
+    return `Merhaba ${person['First Name'] || ''} ${person['Last Name'] || ''},
+  
+  Yazılım geliştiricisi olarak ${person['Company'] ? person['Company'] + ' şirketinizde' : 'şirketinizde'} uygun bir pozisyonda görev almak ve ekibinize katkı sağlamak isterim.
+  
+  Ortaokul yıllarından bu yana yazılım alanında kendimi geliştiriyorum. React, React Native, Node.js gibi teknolojilerle projeler ürettim ve aktif olarak bir startup’ta frontend developer olarak görev aldım. Aynı zamanda başvuru ve iletişim süreçlerini kolaylaştırmak adına geliştirdiğim [Mailwise](https://omerfarukyilmaz.dev) adlı platform üzerinden bu e-postayı tarafınıza iletiyorum.
+  
+  Mailwise, teknik profillerin doğrudan doğru kişilere ulaşmasını ve başvuru sürecinin daha verimli ve etkili ilerlemesini hedeflemektedir.
+  
+  CV’m ekte yer almaktadır. Uygun görmeniz hâlinde sizinle daha detaylı bir görüşme gerçekleştirmekten memnuniyet duyarım.
+  
+  İyi çalışmalar dilerim.  
+  Ömer Faruk Yılmaz  
+  omer@omerfarukyilmaz.dev  
+  https://omerfarukyilmaz.dev`;
 }
 
 async function sendMail(to, body, person) {

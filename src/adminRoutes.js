@@ -4,6 +4,7 @@ import { generateToken, hashPassword, comparePassword, authMiddleware } from './
 import EmailQueue from './emailQueueModel.js';
 import MailLog from './mailLogModel.js';
 import jwt from 'jsonwebtoken';
+import MailAccount from './mailAccountModel.js';
 
 const router = express.Router();
 
@@ -202,6 +203,50 @@ router.get('/top-companies', authMiddleware, async (req, res) => {
         console.log(error, "error test")
         res.status(500).json({ error: 'Şirket istatistiği alınamadı', details: error.message });
     }
+});
+
+// List all mail accounts
+router.get('/mail-accounts', authMiddleware, async (req, res) => {
+  try {
+    const accounts = await MailAccount.find();
+    res.json({ accounts });
+  } catch (error) {
+    res.status(500).json({ error: 'Mail hesapları listelenemedi', details: error.message });
+  }
+});
+
+// Add a new mail account
+router.post('/mail-accounts', authMiddleware, async (req, res) => {
+  try {
+    const { user, pass, from, dailyLimit, active } = req.body;
+    const account = await MailAccount.create({ user, pass, from, dailyLimit, active });
+    res.json({ account });
+  } catch (error) {
+    res.status(500).json({ error: 'Mail hesabı eklenemedi', details: error.message });
+  }
+});
+
+// Update a mail account
+router.put('/mail-accounts/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const update = req.body;
+    const account = await MailAccount.findByIdAndUpdate(id, update, { new: true });
+    res.json({ account });
+  } catch (error) {
+    res.status(500).json({ error: 'Mail hesabı güncellenemedi', details: error.message });
+  }
+});
+
+// Delete a mail account
+router.delete('/mail-accounts/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await MailAccount.findByIdAndDelete(id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Mail hesabı silinemedi', details: error.message });
+  }
 });
 
 export default router; 
