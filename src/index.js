@@ -52,10 +52,7 @@ const SELECTED_FIELDS = [
 dotenv.config();
 
 // MongoDB bağlantısı
-mongoose.connect("mongodb+srv://omer:cnZXReX0N7fiGIAQ@cluster0.a6nr3dw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0" || "mongodb://localhost:27017/maildb", {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-}).then(() => {
+mongoose.connect("mongodb+srv://omer:cnZXReX0N7fiGIAQ@cluster0.a6nr3dw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0").then(() => {
     console.log('MongoDB bağlantısı başarılı');
 }).catch(err => {
     console.error('MongoDB bağlantı hatası:', err);

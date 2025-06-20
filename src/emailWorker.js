@@ -88,12 +88,9 @@ async function sendEmail(emailData) {
 if (workerData && workerData.batch) {
     console.log(workerData, "worker data var")
     // MongoDB bağlantısı
-    mongoose.connect("mongodb+srv://omer:cnZXReX0N7fiGIAQ@cluster0.a6nr3dw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0", {
-        useNewUrlParser: true,
-        useUnifiedTopology: true
-    }).then(async () => {
+    mongoose.connect("mongodb+srv://omer:cnZXReX0N7fiGIAQ@cluster0.a6nr3dw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0").then(async () => {
         console.log('Worker MongoDB bağlantısı başarılı');
-        
+
         for (const email of workerData.batch) {
             try {
                 await sendEmail(email);
@@ -103,7 +100,7 @@ if (workerData && workerData.batch) {
                 console.error('Worker email processing error:', error);
             }
         }
-        
+
         parentPort.postMessage({ done: true });
         process.exit(0);
     }).catch(err => {

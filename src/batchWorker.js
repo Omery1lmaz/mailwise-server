@@ -31,7 +31,7 @@ async function sendEmail(emailData) {
     try {
         // String ObjectId'yi ObjectId'ye çevir
         const objectId = new mongoose.Types.ObjectId(emailData._id);
-        
+
         // Email gönderme işlemi başladı
         await EmailQueue.findByIdAndUpdate(objectId, { isProcessing: true });
 
@@ -95,14 +95,11 @@ async function sendEmail(emailData) {
 // Worker thread için batch processing
 if (workerData && workerData.batch) {
     console.log('Batch worker started with', workerData.batch.length, 'emails');
-    
+
     // MongoDB bağlantısı
-    mongoose.connect("mongodb+srv://omer:cnZXReX0N7fiGIAQ@cluster0.a6nr3dw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0", {
-        useNewUrlParser: true,
-        useUnifiedTopology: true
-    }).then(async () => {
+    mongoose.connect("mongodb+srv://omer:cnZXReX0N7fiGIAQ@cluster0.a6nr3dw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0").then(async () => {
         console.log('Batch worker MongoDB bağlantısı başarılı');
-        
+
         // Bugün gönderilen email sayısını kontrol et
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -140,7 +137,7 @@ if (workerData && workerData.batch) {
                 console.error('Batch worker email processing error:', error);
             }
         }
-        
+
         console.log('Batch processing completed');
         parentPort.postMessage({ done: true, processed: maxBatchSize, total: workerData.batch.length });
         process.exit(0);
