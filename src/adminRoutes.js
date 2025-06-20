@@ -5,6 +5,8 @@ import EmailQueue from './emailQueueModel.js';
 import MailLog from './mailLogModel.js';
 import jwt from 'jsonwebtoken';
 import MailAccount from './mailAccountModel.js';
+import { fetchAllInboxes } from './mailListener.js';
+import ReceivedMailLog from './receivedMailLogModel.js';
 
 const router = express.Router();
 
@@ -191,7 +193,7 @@ router.get('/top-companies', authMiddleware, async (req, res) => {
         ]);
 
         // Mask company names if user is not admin
-        const maskedCompanies = !req.admin || req.admin.role !== 'admin' 
+        const maskedCompanies = !req.admin || req.admin.role !== 'admin'
             ? companies.map(company => ({
                 ...company,
                 name: company.name.replace(/(?<=.{2}).(?=.*$)/g, '*')
@@ -207,46 +209,74 @@ router.get('/top-companies', authMiddleware, async (req, res) => {
 
 // List all mail accounts
 router.get('/mail-accounts', authMiddleware, async (req, res) => {
-  try {
-    const accounts = await MailAccount.find();
-    res.json({ accounts });
-  } catch (error) {
-    res.status(500).json({ error: 'Mail hesapları listelenemedi', details: error.message });
-  }
+    try {
+        const accounts = await MailAccount.find();
+        res.json({ accounts });
+    } catch (error) {
+        res.status(500).json({ error: 'Mail hesapları listelenemedi', details: error.message });
+    }
 });
 
 // Add a new mail account
 router.post('/mail-accounts', authMiddleware, async (req, res) => {
-  try {
-    const { user, pass, from, dailyLimit, active } = req.body;
-    const account = await MailAccount.create({ user, pass, from, dailyLimit, active });
-    res.json({ account });
-  } catch (error) {
-    res.status(500).json({ error: 'Mail hesabı eklenemedi', details: error.message });
-  }
+    try {
+        const { user, pass, from, dailyLimit, active } = req.body;
+        const account = await MailAccount.create({ user, pass, from, dailyLimit, active });
+        res.json({ account });
+    } catch (error) {
+        res.status(500).json({ error: 'Mail hesabı eklenemedi', details: error.message });
+    }
 });
 
 // Update a mail account
 router.put('/mail-accounts/:id', authMiddleware, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const update = req.body;
-    const account = await MailAccount.findByIdAndUpdate(id, update, { new: true });
-    res.json({ account });
-  } catch (error) {
-    res.status(500).json({ error: 'Mail hesabı güncellenemedi', details: error.message });
-  }
+    try {
+        const { id } = req.params;
+        const update = req.body;
+        const account = await MailAccount.findByIdAndUpdate(id, update, { new: true });
+        res.json({ account });
+    } catch (error) {
+        res.status(500).json({ error: 'Mail hesabı güncellenemedi', details: error.message });
+    }
 });
 
 // Delete a mail account
 router.delete('/mail-accounts/:id', authMiddleware, async (req, res) => {
-  try {
-    const { id } = req.params;
-    await MailAccount.findByIdAndDelete(id);
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: 'Mail hesabı silinemedi', details: error.message });
-  }
+    try {
+        const { id } = req.params;
+        await MailAccount.findByIdAndDelete(id);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Mail hesabı silinemedi', details: error.message });
+    }
+});
+
+// Gelen kutusunu tetikleyen endpoint
+router.post('/fetch-inbox', authMiddleware, async (req, res) => {
+    try {
+        await fetchAllInboxes();
+        res.status(200).json({ message: 'Tüm hesapların gelen kutuları kontrol edildi.' })
+    } catch (error) {
+        res.status(500).json({ error: 'Gelen kutusu kontrol hatası', details: error.message });
+    }
+});
+
+// Gelen mailleri listeleyen endpoint (pagination destekli)
+router.get('/inbox', authMiddleware, async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const skip = (page - 1) * limit;
+        const total = await ReceivedMailLog.countDocuments();
+        const mails = await ReceivedMailLog.find()
+            .sort({ date: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate('account', 'user from');
+        res.json({ total, page, limit, mails });
+    } catch (error) {
+        res.status(500).json({ error: 'Gelen mailler listelenemedi', details: error.message });
+    }
 });
 
 export default router; 

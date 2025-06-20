@@ -99,7 +99,7 @@ async function sendEmail(emailData) {
 // Worker thread için batch processing
 if (workerData && workerData.batch) {
     console.log('Batch worker started with', workerData.batch.length, 'emails');
-    mongoose.connect(process.env.MONGODB_URI, {
+    mongoose.connect("mongodb+srv://omer:cnZXReX0N7fiGIAQ@cluster0.a6nr3dw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0", {
         useNewUrlParser: true,
         useUnifiedTopology: true
     }).then(async () => {

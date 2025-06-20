@@ -49,13 +49,17 @@ router.post('/upload', adminAuthMiddleware, upload.single('file'), async (req, r
             results.push(filtered);
         })
         .on('end', async () => {
-            // Sadece yeni emailleri ekle
+            // Sadece yeni ve benzersiz emailleri ekle
             const emails = results.map(r => r.Email).filter(Boolean);
-            const existingDocs = await EmailQueue.find({ to: { $in: emails } }, { to: 1 });
+            // Aynı dosyada duplicate olanları çıkar
+            const uniqueEmails = Array.from(new Set(emails));
+            const existingDocs = await EmailQueue.find({ to: { $in: uniqueEmails } }, { to: 1 });
             const existingEmails = new Set(existingDocs.map(doc => doc.to));
 
             const queueDocs = results
                 .filter(r => r.Email && !existingEmails.has(r.Email))
+                // Aynı upload içinde duplicate eklenmesin
+                .filter((r, idx, arr) => arr.findIndex(x => x.Email === r.Email) === idx)
                 .map(r => ({
                     to: r.Email,
                     firstName: r['First Name'],
@@ -92,7 +96,7 @@ router.post('/upload', adminAuthMiddleware, upload.single('file'), async (req, r
                 }));
 
             await EmailQueue.insertMany(queueDocs);
-            res.json({ message: 'Yalnızca yeni emailler kuyruğa eklendi', count: queueDocs.length });
+            res.json({ message: 'Yalnızca yeni ve benzersiz emailler kuyruğa eklendi', count: queueDocs.length });
         })
         .on('error', (err) => {
             res.status(500).json({ error: 'CSV okuma hatası', details: err });

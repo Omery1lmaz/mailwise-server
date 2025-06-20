@@ -1,4 +1,3 @@
-
 export async function cron(req, res) {
     console.log('Starting every-2-minutes email processing...');
     try {
@@ -50,7 +49,6 @@ import mongoose from 'mongoose';
 import EmailQueue from './emailQueueModel.js';
 import { createMailBody } from './index.js';
 import dotenv from 'dotenv';
-import cron from 'node-cron';
 import MailLog from './mailLogModel.js';
 import nodemailer from 'nodemailer';
 import path from 'path';

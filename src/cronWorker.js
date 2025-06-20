@@ -16,21 +16,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function getRandomAvailableAccount() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const accounts = await MailAccount.find({ active: true });
-  // Günlük limit sıfırlama
-  for (const acc of accounts) {
-    if (!acc.lastSentDate || acc.lastSentDate < today) {
-      acc.sentToday = 0;
-      acc.lastSentDate = today;
-      await acc.save();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const accounts = await MailAccount.find({ active: true });
+    // Günlük limit sıfırlama
+    for (const acc of accounts) {
+        if (!acc.lastSentDate || acc.lastSentDate < today) {
+            acc.sentToday = 0;
+            acc.lastSentDate = today;
+            await acc.save();
+        }
     }
-  }
-  const available = accounts.filter(acc => acc.sentToday < acc.dailyLimit);
-  if (available.length === 0) throw new Error('Tüm SMTP hesaplarının günlük limiti doldu');
-  const idx = Math.floor(Math.random() * available.length);
-  return available[idx];
+    const available = accounts.filter(acc => acc.sentToday < acc.dailyLimit);
+    if (available.length === 0) throw new Error('Tüm SMTP hesaplarının günlük limiti doldu');
+    const idx = Math.floor(Math.random() * available.length);
+    return available[idx];
 }
 
 // Email gönderme fonksiyonu
@@ -69,15 +69,20 @@ async function sendEmail(emailData) {
         account.sentToday += 1;
         account.lastSentDate = new Date();
         await account.save();
-
+        const qEmail = await EmailQueue.findById(emailData._id)
+        qEmail.isSend = true;
+        qEmail.status = 'sent';
+        qEmail.isProcessing = false;
+        qEmail.sentAt = new Date()
         // Başarılı gönderim kaydı
-        await EmailQueue.findByIdAndUpdate(emailData._id, {
-            isSend: true,
-            isProcessing: false,
-            status: 'sent',
-            sentAt: new Date()
-        });
-
+        // await EmailQueue.findByIdAndUpdate(emailData._id, {
+        //     isSend: true,
+        //     isProcessing: false,
+        //     status: 'sent',
+        //     sentAt: new Date()
+        // });
+        await qEmail.save();
+    
         // Log kaydı oluştur
         await MailLog.create({
             email: emailData.email,
@@ -137,7 +142,7 @@ cron.schedule('*/2 * * * *', async () => {
             isSend: false,
             isProcessing: false,
             status: { $ne: 'error' }
-        }).limit(limit);
+        }).limit(1);
 
         console.log(`Found ${pendingEmails.length} pending emails to process (limit: ${limit})`);
 
