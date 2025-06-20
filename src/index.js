@@ -13,6 +13,8 @@ import MailLog from './mailLogModel.js';
 import adminRoutes from './adminRoutes.js';
 import emailQueueRoutes from './emailQueueRoutes.js';
 import EmailQueue from './emailQueueModel.js';
+import userRoutes from './userRoutes.js';
+import './cronWorker.js'; // Cron job'ı başlatmak için import
 
 const SELECTED_FIELDS = [
     'First Name',
@@ -195,6 +197,7 @@ app.get('/health', (req, res) => {
 
 app.use('/admin', adminRoutes);
 app.use('/queue', emailQueueRoutes);
+app.use('/user', userRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

@@ -7,9 +7,17 @@ import EmailQueue from './emailQueueModel.js';
 import { sendMail, createMailBody } from './index.js';
 import { Worker } from 'worker_threads';
 import { fileURLToPath } from 'url';
+import { adminAuthMiddleware } from './auth.js';
+import { Parser as Json2csvParser } from 'json2csv';
+import nodemailer from 'nodemailer';
+import MailLog from './mailLogModel.js';
 
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
+
+// ES modules için __dirname alternatifi
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const SELECTED_FIELDS = [
     'First Name', 'Last Name', 'Title', 'Company', 'Company Name for Emails', 'Email',
@@ -20,7 +28,7 @@ const SELECTED_FIELDS = [
     'Secondary Email', 'Tertiary Email', 'Technologies'
 ];
 
-router.post('/upload', upload.single('file'), async (req, res) => {
+router.post('/upload', adminAuthMiddleware, upload.single('file'), async (req, res) => {
     const filePath = req.file.path;
     const results = [];
 
@@ -85,27 +93,94 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         });
 });
 
-router.post('/send-batch', async (req, res) => {
-    const batch = await EmailQueue.find({ isSend: false, isProcessing: false }).limit(80);
-    const ids = batch.map(item => item._id);
-    await EmailQueue.updateMany({ _id: { $in: ids } }, { isProcessing: true });
+router.post('/send-batch', adminAuthMiddleware, async (req, res) => {
+    try {
+        await EmailQueue.updateMany({}, { isSend: false, isProcessing: false }).limit(80);
+        const batch = await EmailQueue.find({ isSend: false, isProcessing: false }).limit(80);
+        const ids = batch.map(item => item._id);
+        await EmailQueue.updateMany({ _id: { $in: ids } }, { isProcessing: true });
 
-    // Worker başlat
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = path.dirname(__filename);
-    const worker = new Worker(path.join(__dirname, 'emailWorker.js'), {
-        workerData: { batch: batch.map(item => item.toObject()) }
-    });
-    worker.on('message', (msg) => {
-        if (msg.done) {
-            console.log('Batch mail gönderimi tamamlandı.');
-        }
-    });
-    worker.on('error', (err) => {
-        console.error('Worker error:', err);
-    });
+        // ObjectId'leri string'e çevir
+        const serializedBatch = batch.map(item => {
+            const obj = item.toObject();
+            obj._id = obj._id.toString();
+            return obj;
+        });
 
-    res.json({ message: '80 email gönderimi worker ile başlatıldı', count: batch.length });
+        // Worker thread başlat
+        const worker = new Worker(path.join(__dirname, 'batchWorker.js'), {
+            workerData: { batch: serializedBatch }
+        });
+
+        worker.on('message', (msg) => {
+            if (msg.done) {
+                console.log(`Batch mail gönderimi tamamlandı. İşlenen: ${msg.processed}/${msg.total}`);
+            } else if (msg.error) {
+                console.error('Worker error:', msg.error);
+            }
+        });
+
+        worker.on('error', (err) => {
+            console.error('Worker error:', err);
+        });
+
+        worker.on('exit', (code) => {
+            if (code !== 0) {
+                console.error(`Worker stopped with exit code ${code}`);
+            }
+        });
+
+        res.json({ 
+            message: 'Batch mail gönderimi worker ile başlatıldı', 
+            count: batch.length,
+            status: 'processing'
+        });
+    } catch (error) {
+        console.error('Batch processing error:', error);
+        res.status(500).json({ error: 'Batch işleme hatası', details: error.message });
+    }
+});
+
+// Tekil e-posta gönder
+router.post('/send/:id', adminAuthMiddleware, async (req, res) => {
+    try {
+        const email = await EmailQueue.findById(req.params.id);
+        if (!email) return res.status(404).json({ error: 'Email bulunamadı' });
+        if (email.isSend) return res.status(400).json({ error: 'Zaten gönderilmiş' });
+        const body = createMailBody(email.personData || email);
+        await sendMail(email.to, body, email.personData || email);
+        email.isSend = true;
+        await email.save();
+        res.json({ message: 'E-posta başarıyla gönderildi' });
+    } catch (err) {
+        res.status(500).json({ error: 'Tekil gönderim hatası', details: err.message });
+    }
+});
+
+// Kuyruktan sil
+router.delete('/:id', adminAuthMiddleware, async (req, res) => {
+    try {
+        const email = await EmailQueue.findByIdAndDelete(req.params.id);
+        if (!email) return res.status(404).json({ error: 'Email bulunamadı' });
+        res.json({ message: 'Kuyruktan silindi' });
+    } catch (err) {
+        res.status(500).json({ error: 'Silme hatası', details: err.message });
+    }
+});
+
+// Kuyruğu CSV olarak dışa aktar
+router.get('/export', adminAuthMiddleware, async (req, res) => {
+    try {
+        const emails = await EmailQueue.find();
+        const fields = Object.keys(EmailQueue.schema.paths).filter(f => f !== '__v' && f !== '_id');
+        const parser = new Json2csvParser({ fields });
+        const csv = parser.parse(emails.map(e => e.toObject()));
+        res.header('Content-Type', 'text/csv');
+        res.attachment('queue_export.csv');
+        return res.send(csv);
+    } catch (err) {
+        res.status(500).json({ error: 'Export hatası', details: err.message });
+    }
 });
 
 export default router; 

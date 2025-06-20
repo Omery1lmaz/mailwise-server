@@ -7,7 +7,6 @@ import MailLog from './mailLogModel.js';
 import nodemailer from 'nodemailer';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { parentPort, workerData } from 'worker_threads';
 
 dotenv.config();
 
@@ -84,64 +83,54 @@ async function sendEmail(emailData) {
     }
 }
 
-// Worker thread için batch processing
-if (workerData && workerData.batch) {
-    console.log(workerData, "worker data var")
-    // MongoDB bağlantısı
-    mongoose.connect("mongodb+srv://omer:cnZXReX0N7fiGIAQ@cluster0.a6nr3dw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0", {
-        useNewUrlParser: true,
-        useUnifiedTopology: true
-    }).then(async () => {
-        console.log('Worker MongoDB bağlantısı başarılı');
-        
-        for (const email of workerData.batch) {
-            try {
-                await sendEmail(email);
-                // 5 dakika bekle
-                await new Promise(resolve => setTimeout(resolve, 3000));
-            } catch (error) {
-                console.error('Worker email processing error:', error);
-            }
+// Her saat başı çalışacak cron job
+cron.schedule('0 * * * *', async () => {
+    console.log('Starting hourly email processing...');
+    try {
+        // Bugün gönderilen email sayısını kontrol et
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const todaySentCount = await EmailQueue.countDocuments({
+            isSend: true,
+            sentAt: { $gte: today, $lt: tomorrow }
+        });
+
+        console.log(`Today's sent email count: ${todaySentCount}`);
+
+        // Günlük limit kontrolü
+        if (todaySentCount >= 100) {
+            console.log('Daily email limit (100) reached. Skipping hourly processing.');
+            return;
         }
-        
-        parentPort.postMessage({ done: true });
-        process.exit(0);
-    }).catch(err => {
-        console.error('Worker MongoDB bağlantı hatası:', err);
-        parentPort.postMessage({ error: err.message });
-        process.exit(1);
-    });
-} else {
-    // Cron job için normal çalışma - sadece cron job'ı başlat, server başlatma
-    // Her dakika çalışacak cron job
-    cron.schedule('0 * * * *', async () => {
-        console.log('Starting minute email processing...');
-        try {
-            // İşlenmemiş emailleri bul
-            const pendingEmails = await EmailQueue.find({
-                isSend: false,
-                isProcessing: false,
-                status: { $ne: 'error' }
-            }).limit(50); // Her seferde en fazla 50 email işle
 
-            console.log(`Found ${pendingEmails.length} pending emails to process`);
+        // Kalan gönderilebilecek email sayısı
+        const remainingEmails = 100 - todaySentCount;
+        const limit = Math.min(50, remainingEmails); // En fazla 50 veya kalan sayı
 
-            // Her email için gönderim işlemini başlat
-            for (const email of pendingEmails) {
-                await sendEmail(email);
-                // Rate limiting için 5 dakika bekle
-                await new Promise(resolve => setTimeout(resolve, 300000));
-            }
+        // İşlenmemiş emailleri bul
+        const pendingEmails = await EmailQueue.find({
+            isSend: false,
+            isProcessing: false,
+            status: { $ne: 'error' }
+        }).limit(limit);
 
-            console.log('Minute email processing completed');
-        } catch (error) {
-            console.error('Error in cron job:', error);
+        console.log(`Found ${pendingEmails.length} pending emails to process (limit: ${limit})`);
+
+        // Her email için gönderim işlemini başlat
+        for (const email of pendingEmails) {
+            await sendEmail(email);
+            // Rate limiting için 5 dakika bekle
+            await new Promise(resolve => setTimeout(resolve, 300000));
         }
-    });
 
-    // Worker başlatıldığında log
-    console.log('Email worker started and cron job scheduled for minute execution');
-}
+        console.log('Hourly email processing completed');
+    } catch (error) {
+        console.error('Error in cron job:', error);
+    }
+});
 
 // Manuel email gönderimi için export
 export const processEmail = async (emailId) => {
@@ -155,4 +144,7 @@ export const processEmail = async (emailId) => {
         console.error('Error processing email:', error);
         return false;
     }
-}; 
+};
+
+// Cron worker başlatıldığında log
+console.log('Cron worker started and scheduled for hourly execution'); 
