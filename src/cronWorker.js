@@ -82,7 +82,7 @@ async function sendEmail(emailData) {
         //     sentAt: new Date()
         // });
         await qEmail.save();
-    
+
         // Log kaydı oluştur
         await MailLog.create({
             email: emailData.email,
@@ -111,7 +111,7 @@ async function sendEmail(emailData) {
 }
 
 // Her iki dakikada bir çalışacak cron job
-cron.schedule('*/2 * * * *', async () => {
+cron.schedule('* * * * *', async () => {
     console.log('Starting every-2-minutes email processing...');
     try {
         // Bugün gönderilen email sayısını kontrol et
@@ -158,6 +158,8 @@ cron.schedule('*/2 * * * *', async () => {
         console.error('Error in cron job:', error);
     }
 });
+
+// Her dakikada bir gelen kutularını kontrol et
 
 // Manuel email gönderimi için export
 export const processEmail = async (emailId) => {

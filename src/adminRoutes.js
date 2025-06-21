@@ -61,8 +61,34 @@ router.get('/queue-emails', authMiddleware, async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
-    const total = await EmailQueue.countDocuments();
-    let emails = await EmailQueue.find().skip(skip).limit(limit).sort({ createdAt: -1 });
+
+    const { status, company, date, search } = req.query;
+    const query = {};
+
+    if (status) {
+        if (status === 'sent') query.isSend = true;
+        else if (status === 'queued') query.isSend = false;
+        else if (status === 'processing') query.isProcessing = true;
+        else if (status === 'error') query.status = 'error';
+    }
+    if (company) query.company = company;
+    if (date) {
+        const startDate = new Date(date);
+        const endDate = new Date(date);
+        endDate.setDate(endDate.getDate() + 1);
+        query.createdAt = { $gte: startDate, $lt: endDate };
+    }
+    if (search) {
+        query.$or = [
+            { email: { $regex: search, $options: 'i' } },
+            { firstName: { $regex: search, $options: 'i' } },
+            { lastName: { $regex: search, $options: 'i' } },
+            { company: { $regex: search, $options: 'i' } }
+        ];
+    }
+
+    const total = await EmailQueue.countDocuments(query);
+    let emails = await EmailQueue.find(query).skip(skip).limit(limit).sort({ createdAt: -1 });
     console.log(req.admin, "req admin")
     if (!req.admin || req.admin.role !== 'admin') emails = maskSensitive(emails);
     res.json({ total, page, limit, emails });
@@ -73,8 +99,21 @@ router.get('/processing-emails', authMiddleware, async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
-    const total = await EmailQueue.countDocuments({ isProcessing: true });
-    let emails = await EmailQueue.find({ isProcessing: true }).skip(skip).limit(limit).sort({ createdAt: -1 });
+
+    const { search } = req.query;
+    const query = { isProcessing: true };
+
+    if (search) {
+        query.$or = [
+            { email: { $regex: search, $options: 'i' } },
+            { firstName: { $regex: search, $options: 'i' } },
+            { lastName: { $regex: search, $options: 'i' } },
+            { company: { $regex: search, $options: 'i' } }
+        ];
+    }
+
+    const total = await EmailQueue.countDocuments(query);
+    let emails = await EmailQueue.find(query).skip(skip).limit(limit).sort({ createdAt: -1 });
     if (!req.admin || req.admin.role !== 'admin') emails = maskSensitive(emails);
     res.json({ total, page, limit, emails });
 });
@@ -84,8 +123,28 @@ router.get('/not-sended-emails', authMiddleware, async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
-    const total = await EmailQueue.countDocuments({ isSend: false });
-    let emails = await EmailQueue.find({ isSend: false }).skip(skip).limit(limit).sort({ createdAt: -1 });
+
+    const { company, date, search } = req.query;
+    const query = { isSend: false };
+
+    if (company) query.company = company;
+    if (date) {
+        const startDate = new Date(date);
+        const endDate = new Date(date);
+        endDate.setDate(endDate.getDate() + 1);
+        query.createdAt = { $gte: startDate, $lt: endDate };
+    }
+    if (search) {
+        query.$or = [
+            { email: { $regex: search, $options: 'i' } },
+            { firstName: { $regex: search, $options: 'i' } },
+            { lastName: { $regex: search, $options: 'i' } },
+            { company: { $regex: search, $options: 'i' } }
+        ];
+    }
+
+    const total = await EmailQueue.countDocuments(query);
+    let emails = await EmailQueue.find(query).skip(skip).limit(limit).sort({ createdAt: -1 });
     if (!req.admin || req.admin.role !== 'admin') emails = maskSensitive(emails);
     res.json({ total, page, limit, emails });
 });
@@ -204,6 +263,15 @@ router.get('/top-companies', authMiddleware, async (req, res) => {
     } catch (error) {
         console.log(error, "error test")
         res.status(500).json({ error: 'Şirket istatistiği alınamadı', details: error.message });
+    }
+});
+
+router.get('/companies', authMiddleware, async (req, res) => {
+    try {
+        const companies = await EmailQueue.distinct('company');
+        res.json({ companies });
+    } catch (error) {
+        res.status(500).json({ error: 'Şirket listesi alınamadı', details: error.message });
     }
 });
 
