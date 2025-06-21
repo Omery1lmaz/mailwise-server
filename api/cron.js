@@ -59,7 +59,7 @@ export default async function handler(req, res) {
         await transporter.sendMail(mailOptions);
         account.sentToday += 1; account.lastSentDate = new Date(); await account.save();
         await EmailQueue.findByIdAndUpdate(email._id, {
-          isSend: true, isProcessing: false, status: 'sent', sentAt: new Date()
+          isSend: true, isProcessing: false, status: 'sent', sendAt: new Date()
         });
         await MailLog.create({
           email: email.email,

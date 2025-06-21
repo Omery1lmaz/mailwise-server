@@ -73,7 +73,7 @@ async function sendEmail(emailData) {
         qEmail.isSend = true;
         qEmail.status = 'sent';
         qEmail.isProcessing = false;
-        qEmail.sentAt = new Date()
+        qEmail.sendAt = new Date()
         // Başarılı gönderim kaydı
         // await EmailQueue.findByIdAndUpdate(emailData._id, {
         //     isSend: true,

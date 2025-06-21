@@ -34,7 +34,8 @@ const emailQueueSchema = new mongoose.Schema({
     personData: Object, // Tüm satırın orijinali
     isSend: { type: Boolean, default: false },
     isProcessing: { type: Boolean, default: false },
-    createdAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
+    sendAt: { type: Date }
 });
 
 export default mongoose.model('EmailQueue', emailQueueSchema); 

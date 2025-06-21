@@ -163,12 +163,12 @@ router.get('/email-stats-by-date', authMiddleware, async (req, res) => {
 
             const sent = await EmailQueue.countDocuments({
                 isSend: true,
-                createdAt: { $gte: startOfDay, $lt: endOfDay }
+                sendAt: { $gte: startOfDay, $lt: endOfDay }
             });
 
             const notSent = await EmailQueue.countDocuments({
                 isSend: false,
-                createdAt: { $gte: startOfDay, $lt: endOfDay }
+                sendAt: { $gte: startOfDay, $lt: endOfDay }
             });
 
             stats.push({
